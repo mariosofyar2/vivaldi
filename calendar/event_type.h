@@ -6,8 +6,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef CALENDAR_CALENDAR_TYPES_H_
-#define CALENDAR_CALENDAR_TYPES_H_
+#ifndef CALENDAR_EVENT_TYPE_H_
+#define CALENDAR_EVENT_TYPE_H_
 
 #include <stddef.h>
 #include <stdint.h>
@@ -19,35 +19,52 @@
 #include <vector>
 
 #include "base/memory/ref_counted_memory.h"
-#include "base/memory/scoped_vector.h"
 #include "base/strings/string16.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/time/time.h"
+#include "calendar_type.h"
+#include "url/gurl.h"
 
 namespace calendar {
 
 typedef int64_t EventID;
+typedef int64_t AlarmID;
 
 // Bit flags determing which fields should be updated in the
 // UpdateEvent method
 enum UpdateEventFields {
   CALENDAR_ID = 1 << 0,
-  TITLE = 1 << 1,
-  DESCRIPTION = 1 << 2,
-  START = 1 << 3,
-  END = 1 << 4,
+  ALARM_ID = 1 << 1,
+  TITLE = 1 << 2,
+  DESCRIPTION = 1 << 3,
+  START = 1 << 4,
+  END = 1 << 5,
+  ALLDAY = 1 << 6,
+  ISRECURRING = 1 << 7,
+  STARTRECURRING = 1 << 8,
+  ENDRECURRING = 1 << 9,
+  LOCATION = 1 << 10,
+  URL = 1 << 11,
 };
 
 // Represents a simplified version of a event.
 struct CalendarEvent {
   CalendarEvent();
   CalendarEvent(const CalendarEvent& event);
-
-  base::string16 calendar_id;
+  ~CalendarEvent();
+  CalendarID calendar_id;
+  AlarmID alarm_id;
   base::string16 title;
   base::string16 description;
   base::Time start;
   base::Time end;
+  bool all_day;
+  bool is_recurring;
+  base::Time start_recurring;
+  base::Time end_recurring;
+  base::string16 location;
+  base::string16 url;
+
   int updateFields;
 };
 
@@ -57,23 +74,35 @@ struct CalendarEvent {
 class EventRow {
  public:
   EventRow();
-  EventRow(base::string16 id,
-           base::string16 calendar_id,
+  EventRow(EventID id,
+           CalendarID calendar_id,
+           AlarmID alarm_id,
            base::string16 title,
            base::string16 description,
            base::Time start,
-           base::Time end);
+           base::Time end,
+           bool all_day,
+           bool is_recurring,
+           base::Time start_recurring,
+           base::Time end_recurring,
+           base::string16 location,
+           base::string16 url);
   ~EventRow();
 
   EventRow(const EventRow& row);
 
-  base::string16 id() const { return id_; }
-  void set_id(base::string16 id) { id_ = id; }
+  EventRow(const EventRow&&) noexcept;
 
-  base::string16 calendar_id() const { return calendar_id_; }
-  void set_calendar_id(base::string16 calendar_id) {
-    calendar_id_ = calendar_id;
-  }
+  EventRow& operator=(const EventRow& other);
+
+  EventID id() const { return id_; }
+  void set_id(EventID id) { id_ = id; }
+
+  CalendarID calendar_id() const { return calendar_id_; }
+  void set_calendar_id(CalendarID calendar_id) { calendar_id_ = calendar_id; }
+
+  AlarmID alarm_id() const { return alarm_id_; }
+  void set_alarm_id(AlarmID alarm_id) { alarm_id_ = alarm_id; }
 
   base::string16 title() const { return title_; }
   void set_title(base::string16 title) { title_ = title; }
@@ -89,15 +118,44 @@ class EventRow {
   base::Time end() const { return end_; }
   void set_end(base::Time end) { end_ = end; }
 
- protected:
-  void Swap(EventRow* other);
+  bool all_day() const { return all_day_; }
+  void set_all_day(bool all_day) { all_day_ = all_day; }
 
-  base::string16 id_;
-  base::string16 calendar_id_;
+  bool is_recurring() const { return is_recurring_; }
+  void set_is_recurring(bool is_recurring) { is_recurring_ = is_recurring; }
+
+  base::Time start_recurring() const { return start_recurring_; }
+  void set_start_recurring(base::Time start_recurring) {
+    start_recurring_ = start_recurring;
+  }
+
+  base::Time end_recurring() const { return end_recurring_; }
+  void set_end_recurring(base::Time end_recurring) {
+    end_recurring_ = end_recurring;
+  }
+
+  base::string16 location() const { return location_; }
+  void set_location(base::string16 location) { location_ = location; }
+
+  base::string16 url() const { return url_; }
+  void set_url(base::string16 url) { url_ = url; }
+
+  EventID id_;
+  CalendarID calendar_id_;
+  AlarmID alarm_id_;
   base::string16 title_;
   base::string16 description_;
   base::Time start_;
   base::Time end_;
+  bool all_day_;
+  bool is_recurring_;
+  base::Time start_recurring_;
+  base::Time end_recurring_;
+  base::string16 location_;
+  base::string16 url_;
+
+ protected:
+  void Swap(EventRow* other);
 };
 
 typedef std::vector<EventRow> EventRows;
@@ -105,47 +163,16 @@ typedef std::vector<EventRow> EventRows;
 class EventResult : public EventRow {
  public:
   EventResult();
-  EventResult(base::string16 id,
-              base::string16 title,
-              base::string16 description);
   EventResult(const EventRow& event_row);
   EventResult(const EventResult& other);
   ~EventResult();
 
-  base::string16 id() const { return id_; }
-  void set_id(base::string16 id) { id_ = id; }
-
-  base::string16 calendar_id() const { return calendar_id_; }
-  void set_calendar_id(base::string16 calendar_id) {
-    calendar_id_ = calendar_id;
-  }
-
-  base::string16 title() const { return title_; }
-  void set_title(base::string16 title) { title_ = title; }
-
-  base::string16 description() const { return description_; }
-  void set_description(base::string16 description) {
-    description_ = description;
-  }
-
-  base::Time start() const { return start_; }
-  void set_start(base::Time start) { start_ = start; }
-
-  base::Time end() const { return end_; }
-  void set_end(base::Time end) { end_ = end; }
-
   void SwapResult(EventResult* other);
-
- private:
-  base::string16 id_;
-  base::string16 calendar_id_;
-  base::string16 title_;
-  base::string16 description_;
 };
 
 class EventQueryResults {
  public:
-  typedef std::vector<EventResult*> EventResultVector;
+  typedef std::vector<std::unique_ptr<EventResult>> EventResultVector;
 
   EventQueryResults();
   ~EventQueryResults();
@@ -180,9 +207,19 @@ class EventQueryResults {
  private:
   // The ordered list of results. The pointers inside this are owned by this
   // QueryResults object.
-  ScopedVector<EventResult> results_;
+   EventResultVector results_;
 
   DISALLOW_COPY_AND_ASSIGN(EventQueryResults);
+};
+
+class CreateEventResult {
+ public:
+  CreateEventResult();
+  bool success;
+  EventRow createdRow;
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(CreateEventResult);
 };
 
 class UpdateEventResult {
@@ -194,6 +231,15 @@ class UpdateEventResult {
   DISALLOW_COPY_AND_ASSIGN(UpdateEventResult);
 };
 
+class DeleteEventResult {
+ public:
+  DeleteEventResult();
+  bool success;
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(DeleteEventResult);
+};
+
 }  // namespace calendar
 
-#endif  // CALENDAR_CALENDAR_TYPES_H_
+#endif  // CALENDAR_EVENT_TYPE_H_
